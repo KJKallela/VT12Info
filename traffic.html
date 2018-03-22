@@ -1,0 +1,266 @@
+﻿<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="UTF-8">
+<meta name="author" content="Kimmo Kallela">
+
+<title>VT 12 Pirkkahalli Intersection Traffic Information</title>
+
+<link rel="stylesheet" href="styles.css" />
+
+<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/2.2.0/jquery.min.js" ></script>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.0.3/sockjs.min.js"></script>
+<script type="text/javascript" src="smoothie.js"></script>
+<script type="text/javascript" src="raphael.js"></script>
+<script type="text/javascript" src="justgage.js"></script>
+<script type="text/javascript" src="date_time.js"></script>
+		 
+</head>
+
+	 
+<body>
+
+<h1>Liikenneinfo VT 12, Pirkkahallin liittymä, Tampere</h1>
+		 
+<div id="east"><!-- Itään alkaa -->
+<img id = "leftpic" alt="road1">
+<div id="gauge1"></div>
+<label id="keskinop60_1"></label><br><br /> 
+<label id="suurinNopeus1"></label><br><br /> 
+<label id="alinNopeus1"></label><br><br /> 
+<label id="ohitukset1"></label><br><br /> 
+<label id="ohitukset3"></label>
+</div><!-- Itään loppuu -->
+		
+		
+<div id="west"><!-- Länteen alkaa -->
+<img id = "rightpic" alt="road2">	
+<div id="gauge2"></div>
+<label id="keskinop60_2"></label><br><br /> 
+<label id="suurinNopeus2"></label><br><br /> 
+<label id="alinNopeus2"></label><br><br /> 
+<label id="ohitukset2"></label><br><br /> 
+<label id="ohitukset4"></label>
+</div><!-- Länteen loppuu -->
+
+
+<div id="weather"><!-- Säätiedot alkaa-->
+<span id="date_time"></span>
+<script type="text/javascript">window.onload = date_time('date_time');</script>
+</div><!-- Säätiedot loppuu -->
+
+
+		<script>	
+			var contact;
+			var sensor;
+			var name;
+			var longName;
+			var odotellaan = 'Odotetaan tietoa...';
+			var lTil1;
+			var lTil2;
+			var kmh1;
+			var kmh2;
+			var ohitukset1 = odotellaan;
+			var ohitukset2 = odotellaan;
+			var ohitukset3 = odotellaan;
+			var ohitukset4 = odotellaan;
+			var keskinop60_1 = odotellaan;
+			var keskinop60_2 = odotellaan;
+			var ohitukset5Header = 'Liikenne (5 min): ';
+			var ohitukset60Header = 'Liikenne (60 min): ';
+			var keskinopeus60Header = ' Keskinopeus (60 min): ';
+			var suurinNopeus1 = 0;
+			var suurinNopeus2 = 0;
+			var alinNopeus1 = 999;
+			var alinNopeus2 = 999;
+			var suurinNopeusHeader = 'Mittausjakson ylin nopeus: ';
+			var alhaisinNopeusHeader = 'Mittausjakson alin nopeus: ';
+			
+			document.getElementById('leftpic').src="http://weathercam.digitraffic.fi/C0453001.jpg";
+			document.getElementById('rightpic').src="http://weathercam.digitraffic.fi/C0453002.jpg";
+
+			
+            function connect() {
+                 var url = "ws://tie.digitraffic.fi/api/v1/plain-websockets/tmsdata/23449";
+				 
+                 var socket = new WebSocket(url);
+                 socket.onopen = function (event) {
+                     console.info('Socket is open');
+                 }
+                 socket.onmessage = function(message) {
+                     addMessage(message);
+                 };
+             }
+			 
+			 function connectWeather() {
+				var weatherUrl = "https://tie.digitraffic.fi/api/v1/data/weather-data/4020";
+				var xmlhttp = new XMLHttpRequest();
+				
+				console.info('Connected ' + weatherUrl);
+				
+				xmlhttp.onreadystatechange = function() {
+					addWeatherMessage(this.responseText);
+				};
+				
+				xmlhttp.open("GET", weatherUrl, true);
+				xmlhttp.send();
+				
+			 }
+			 
+					 
+			 
+			 function addWeatherMessage(message) {
+				try {
+					 var textW  = JSON.stringify(message)
+					 var contactW = JSON.parse(textW); 
+				}
+				
+				catch(err) {
+					console.info('Parsing error ' + message);
+				 }
+				
+				//console.info(contactW);
+			 }
+			 			 
+             function addMessage(message) {
+                 var text  = convert(message);
+				 try {
+					 contact = JSON.parse(text); 
+					 name = contact.sensorValue.shortName;
+					 sensor = contact.sensorValue.sensorValue;
+					 longName = contact.sensorValue.name;
+					 
+					 if (name == "LTil1") lTil1 = sensor;
+					 if (name == "LTil2") lTil2 = sensor;	
+					 if (name == "km/h1") kmh1 = sensor;
+					 if (name == "km/h2") kmh2 = sensor;
+					 if (longName == "OHITUKSET_5MIN_KIINTEA_SUUNTA1_MS1") ohitukset1 = sensor;
+					 if (longName == "OHITUKSET_5MIN_KIINTEA_SUUNTA2_MS2") ohitukset2 = sensor;
+					 if (longName == "OHITUKSET_60MIN_KIINTEA_SUUNTA1_MS1") ohitukset3 = sensor;
+					 if (longName == "OHITUKSET_60MIN_KIINTEA_SUUNTA2_MS2") ohitukset4 = sensor;
+					 if (longName == "KESKINOPEUS_60MIN_KIINTEA_SUUNTA1") keskinop60_1 = sensor;
+					 if (longName == "KESKINOPEUS_60MIN_KIINTEA_SUUNTA2") keskinop60_2 = sensor;
+				 }
+				 catch(err) {
+					console.info('Parsing error ' + text);
+				 }
+				 
+				 
+				 console.info(contact);
+             }
+             function convert(message) {
+                 return JSON.stringify(JSON.parse(message.data));
+             }
+			 
+			 function getlTil1() {
+				return lTil1;
+			 }
+			 
+			 function getlTil2() {
+				return lTil2;
+			 }
+			 
+			 function getkmh1() {
+				return kmh1;
+			 }
+			 
+			  function getkmh2() {
+				return kmh2;
+			 }
+			 
+			 function getOhitukset1() {
+				return ohitukset1;
+			 }
+			 
+			 function getOhitukset2() {
+				return ohitukset2;
+			 }
+			 
+			 function getOhitukset3() {
+				return ohitukset3;
+			 }
+			 function getOhitukset4() {
+				return ohitukset4;
+			 }
+			 
+			 function getKeskinop60_1() {
+				return keskinop60_1;
+			 }
+			 
+			 function getKeskinop60_2() {
+				return keskinop60_2;
+			 }
+			 
+			 function getSuurinNopeus1() {
+				if (getkmh1() > suurinNopeus1)  suurinNopeus1 = getkmh1();
+				return suurinNopeus1;
+			 }
+			 
+			 function getSuurinNopeus2() {
+				if (getkmh2() > suurinNopeus2)  suurinNopeus2 = getkmh2();
+				return suurinNopeus2;
+			 }
+			 
+			 function getAlinNopeus1() {
+				if (getkmh1() < alinNopeus1)  alinNopeus1 = getkmh1();
+				return alinNopeus1;
+			 }
+			 
+			 function getAlinNopeus2() {
+				if (getkmh2() < alinNopeus2)  alinNopeus2 = getkmh2();
+				return alinNopeus2;
+			 }
+			 
+			 // Lets connect and get to work
+			 connect();
+			 connectWeather();
+			 
+			 var g1 = new JustGage({
+				id: "gauge1",
+				value: 80,
+				min: 40,
+				max: 130,
+				title: "Nokialle km/h"
+			 });
+			 
+			 
+			 var g2 = new JustGage({
+				id: "gauge2",
+				value: 80,
+				min: 40,
+				max: 130,
+				title: "Tampereelle km/h"
+			 });
+			 
+			 var leftPicContainer = document.getElementById('leftpic');
+			 var rightPicContainer = document.getElementById('rightpic');
+			 
+			 setInterval(function() {
+				g1.refresh(getkmh1());
+				g2.refresh(getkmh2());		 
+				
+				leftPicContainer.innerHTML.refresh;
+				rightPicContainer.innerHTML.refresh;
+				
+				document.getElementById('ohitukset1').innerHTML = ohitukset5Header + getOhitukset1();
+				document.getElementById('ohitukset2').innerHTML = ohitukset5Header + getOhitukset2();
+				document.getElementById('ohitukset3').innerHTML = ohitukset60Header + getOhitukset3();
+				document.getElementById('ohitukset4').innerHTML = ohitukset60Header + getOhitukset4();
+				document.getElementById('keskinop60_1').innerHTML = keskinopeus60Header + getKeskinop60_1() + ' km/h';
+				document.getElementById('keskinop60_2').innerHTML = keskinopeus60Header + getKeskinop60_2() + ' km/h';
+				document.getElementById('suurinNopeus1').innerHTML = suurinNopeusHeader + getSuurinNopeus1() + ' km/h';
+				document.getElementById('suurinNopeus2').innerHTML = suurinNopeusHeader + getSuurinNopeus2() + ' km/h';
+				document.getElementById('alinNopeus1').innerHTML = alhaisinNopeusHeader + getAlinNopeus1() + ' km/h';
+				document.getElementById('alinNopeus2').innerHTML = alhaisinNopeusHeader + getAlinNopeus2() + ' km/h';
+			  }, 1000);   // Change this for different interval
+			  
+			 
+         </script>
+	 
+	 
+         <pre class="messages"></pre>
+     </body>
+ </html>
